@@ -1,0 +1,17 @@
+# Never commit weights or data -- they are big and regenerable.
+checkpoints/
+data/
+*.pth
+*.pt
+*.ckpt
+
+# DO commit splits/ -- the split CSVs are what make your work reproducible.
+!splits/
+!splits/*.csv
+
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store

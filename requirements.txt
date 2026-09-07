@@ -1,0 +1,21 @@
+# Core (already preinstalled on Kaggle and Colab -- you only need these locally)
+torch>=2.0
+torchvision>=0.15
+numpy
+pandas
+pyyaml
+
+# Preprocessing (Phase 2)
+opencv-python-headless
+pillow
+
+# Metrics + analysis (Phases 7 and 9)
+scikit-learn
+matplotlib
+statsmodels        # McNemar's test in Phase 9
+
+# Efficiency benchmarking (Phase 8)
+thop               # FLOPs counting
+
+# Convenience
+tqdm

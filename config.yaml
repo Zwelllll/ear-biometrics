@@ -1,0 +1,117 @@
+# ---------------------------------------------------------------------------
+# Single source of truth for hyperparameters.
+#
+# Rule: NEVER hardcode a number in a script. Put it here and read it.
+# When you write the report, this file IS your hyperparameter table -- which is
+# exactly what the paper you're reproducing failed to provide.
+# ---------------------------------------------------------------------------
+
+seed:
+  seeds: [0, 1, 2]        # 3 seeds -> mean +/- std
+  deterministic: true
+
+data:
+  img_size: 224           # all three backbones are pretrained at 224
+  num_workers: 2          # Kaggle/Colab free tier: 2 is the sweet spot
+  # ImageNet normalization -- required because we use pretrained weights.
+  # NOTE: this assumption breaks for the Canny arms (binary edge maps are not
+  # natural images). Document as a known caveat in the report.
+  norm_mean: [0.485, 0.456, 0.406]
+  norm_std:  [0.229, 0.224, 0.225]
+
+splits:
+  # Identification: image-disjoint, subject-SHARED (matches the paper).
+  identification:
+    train: 0.70
+    val:   0.15
+    test:  0.15
+  # Verification: subject-DISJOINT. Identities held out entirely.
+  verification:
+    heldout_identities_ami: 30
+    heldout_identities_earvn: 40
+
+train:
+  epochs: 30
+  batch_size: 32
+  lr: 0.0003
+  weight_decay: 0.0001
+  optimizer: adamw
+  scheduler: cosine
+  early_stop_patience: 7    # on VALIDATION accuracy, never test
+  mixed_precision: true     # ~2x faster on P100/T4, basically free
+  label_smoothing: 0.0
+
+# ---------------------------------------------------------------------------
+# The experiment matrix. Scaled to fit free-tier GPU quota.
+# ---------------------------------------------------------------------------
+experiments:
+  models:
+    - resnet50
+    - mobilenet_v2
+    - efficientnet_b0     # NOT b7 -- b7 overfits 700 images and burns quota
+  arms:
+    - raw
+    - zoom
+    - zoom+canny
+    - zoom+aug
+    - zoom+canny+aug
+  datasets:
+    - ami
+    - earvn
+
+  # Seed policy: AMI is tiny (minutes/run) so seed everything. EarVN is
+  # expensive, so full sweep at 1 seed, then 3 seeds on claim-bearing rows only.
+  seed_policy:
+    ami: all_seeds
+    earvn: single_then_targeted
+
+preprocessing:
+  zoom:
+    # AMI: the paper's documented crop, 492x702 -> 320x490
+    ami: {mode: fixed_crop, out_w: 320, out_h: 490}
+    # EarVN: the paper skipped zoom here entirely, which confounds any
+    # AMI-vs-EarVN comparison. We apply a consistent center crop instead.
+    earvn: {mode: center_crop_frac, frac: 0.80}
+  canny:
+    blur_ksize: 5
+    low_threshold: 100
+    high_threshold: 200
+  augment:
+    # Applied to TRAIN ONLY, on the fly. Never to val/test.
+    rotation_degrees: 15
+    perspective_distortion: 0.2
+    perspective_p: 0.3
+    color_jitter: {brightness: 0.2, contrast: 0.2, saturation: 0.2, hue: 0.05}
+    grayscale_p: 0.1
+    # DANGER: AMI has 6 right-ear + 1 left-ear image per subject. Flipping
+    # indiscriminately collides left/right within an identity. Off by default;
+    # if you enable it, canonicalize ALL images to one orientation instead.
+    horizontal_flip_p: 0.0
+
+verification:
+  embedding_dim: 512
+  head: cosine            # 'cosine' (softmax features) | 'arcface'
+  n_genuine_pairs: 5000
+  n_impostor_pairs: 50000
+  arcface: {scale: 30.0, margin: 0.5}
+
+# ---------------------------------------------------------------------------
+# Where the raw datasets live. Edit the 'local' paths to match YOUR machine.
+# Forward slashes work fine on Windows in Python -- use them, they avoid
+# backslash-escaping bugs.
+# ---------------------------------------------------------------------------
+datasets:
+  ami:
+    local: "D:/Freaking_project/AMI"
+    kaggle: "/kaggle/input/ami-ear-database"
+    colab: "/content/drive/MyDrive/ear-biometrics/data/AMI"
+    # AMI subject IDs are NOT contiguous: subjects 6, 15, 16, 17, 49, 50, 60
+    # were excluded (occlusion). IDs run 0-106 with gaps -> 100 real subjects.
+    id_source: filename        # subject id comes from the FILE name
+    id_regex: '^(\d+)'         # leading digits, e.g. "001_back.jpg" -> "001"
+  earvn:
+    local: "D:/Freaking_project/EarVN1.0 dataset/EarVN1.0 dataset/Images"
+    kaggle: "/kaggle/input/earvn10/Images"
+    colab: "/content/drive/MyDrive/ear-biometrics/data/EarVN1.0/Images"
+    id_source: folder          # subject id comes from the FOLDER name
+    id_regex: '^(\d+)'         # e.g. "001.ALI_HD" -> "001"
