@@ -72,10 +72,29 @@ preprocessing:
     # EarVN: the paper skipped zoom here entirely, which confounds any
     # AMI-vs-EarVN comparison. We apply a consistent center crop instead.
     earvn: {mode: center_crop_frac, frac: 0.80}
+  # Canny thresholds are PER DATASET. The paper used one setting for both, which
+  # cannot work: AMI is clean 492x702 studio imagery, EarVN1.0 is low-resolution
+  # heavily-compressed in-the-wild crops. Both values below were chosen by
+  # inspecting src/canny_tune.py output, not guessed.
+  #
+  # The paper's 100/200 yields a near-BLANK edge map on both datasets
+  # (0.0-0.3% edge density on AMI, 0.3-1.1% on EarVN). That is very likely why
+  # its Canny columns are the worst score in nearly every row of both tables --
+  # the model was fed almost-empty images, so "contour detection hurts accuracy"
+  # is not a supported conclusion.
   canny:
     blur_ksize: 5
-    low_threshold: 100
-    high_threshold: 200
+    mode: fixed             # 'fixed' | 'auto' (per-image gradient percentile)
+    auto_percentile: 90.0   # used only when mode: auto
+    thresholds:
+      # AMI: 20/60 gives ~5-8% density with helix, antihelix and concha all
+      # clearly visible. Higher settings drop the inner structure.
+      ami:   {low: 20, high: 60}
+      # EarVN: 30/90 gives ~4-6.5%. NOTE FOR THE REPORT -- on EarVN the detected
+      # edges are largely JPEG 8x8 block artifacts (visible as right-angled
+      # staircase patterns), not ear anatomy. No threshold recovers real contours
+      # at this resolution. 30/90 is the least-bad option, not a good one.
+      earvn: {low: 30, high: 90}
   augment:
     # Applied to TRAIN ONLY, on the fly. Never to val/test.
     rotation_degrees: 15
