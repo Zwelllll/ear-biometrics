@@ -70,10 +70,17 @@ def build_paths() -> Paths:
         # /kaggle/working persists for the session and is downloadable at the end.
         # /kaggle/input is READ-ONLY (that's where attached datasets appear).
         root = Path("/kaggle/working/ear-biometrics")
+        # IMPORTANT: /kaggle/input is READ-ONLY -- the preprocessing cache must
+        # not go there. /kaggle/temp is scratch space: writable, generous, and
+        # NOT committed as notebook output (so a 1GB cache doesn't bloat your
+        # saved version). It is wiped between sessions, but rebuilding the cache
+        # takes only a couple of minutes.
+        # Raw dataset roots come from config.yaml datasets.<name>.kaggle, which
+        # DO point into /kaggle/input.
         return Paths(
             env=env,
             root=root,
-            data=Path("/kaggle/input"),
+            data=Path("/kaggle/temp"),
             splits=root / "splits",
             results=root / "results",
             checkpoints=root / "checkpoints",

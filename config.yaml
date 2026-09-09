@@ -122,7 +122,7 @@ verification:
 datasets:
   ami:
     local: "D:/Freaking_project/AMI"
-    kaggle: "/kaggle/input/ami-ear-database"
+    kaggle: "/kaggle/input/ami-ear-database/AMI"
     colab: "/content/drive/MyDrive/ear-biometrics/data/AMI"
     # AMI subject IDs are NOT contiguous: subjects 6, 15, 16, 17, 49, 50, 60
     # were excluded (occlusion). IDs run 0-106 with gaps -> 100 real subjects.
@@ -130,7 +130,7 @@ datasets:
     id_regex: '^(\d+)'         # leading digits, e.g. "001_back.jpg" -> "001"
   earvn:
     local: "D:/Freaking_project/EarVN1.0 dataset/EarVN1.0 dataset/Images"
-    kaggle: "/kaggle/input/earvn10/Images"
+    kaggle: "/kaggle/input/earvn-database/EarVN1.0 dataset/EarVN1.0 dataset/Images"
     colab: "/content/drive/MyDrive/ear-biometrics/data/EarVN1.0/Images"
     id_source: folder          # subject id comes from the FOLDER name
     id_regex: '^(\d+)'         # e.g. "001.ALI_HD" -> "001"
