@@ -85,9 +85,10 @@ def make_run_id(**parts: Any) -> str:
     return "__".join(bits)
 
 
-def log_run(**row: Any) -> str:
+def log_run(*, path: Path | None = None, **row: Any) -> str:
     """
-    Append one run to results.csv. Unknown keys raise, missing keys become ''.
+    Append one run to results.csv, or an explicit isolated path for tests.
+    Unknown keys raise, missing keys become ''.
 
     Raising on unknown keys is deliberate: a silent typo like `test_topl`
     (lowercase L) would otherwise vanish and you'd lose the number.
@@ -104,7 +105,7 @@ def log_run(**row: Any) -> str:
     if not row.get("run_id"):
         row["run_id"] = make_run_id(**row)
 
-    path = P.results_csv
+    path = P.results_csv if path is None else Path(path)
     _ensure_header(path)
     with path.open("a", newline="") as f:
         csv.DictWriter(f, fieldnames=FIELDS, restval="").writerow(row)
@@ -123,20 +124,22 @@ def _device_name() -> str:
     return f"cpu ({platform.processor() or platform.machine()})"
 
 
-def load_results():
+def load_results(path: Path | None = None):
     """Load results.csv as a pandas DataFrame (for Phase 9 analysis)."""
     import pandas as pd
-    if not P.results_csv.exists():
+    path = P.results_csv if path is None else Path(path)
+    if not path.exists():
         return pd.DataFrame(columns=FIELDS)
-    return pd.read_csv(P.results_csv)
+    return pd.read_csv(path)
 
 
-def summarise(group_cols=("train_dataset", "model", "arm"), metric="test_top1"):
+def summarise(group_cols=("train_dataset", "model", "arm"), metric="test_top1",
+              *, path: Path | None = None):
     """
     mean +/- std across seeds -- this is the table that goes in your report.
     Returns a DataFrame with n_seeds, mean, std.
     """
-    df = load_results()
+    df = load_results(path=path)
     df = df[df[metric].notna()]
     if df.empty:
         return df

@@ -17,6 +17,8 @@ If this passes on your laptop, it will pass on Kaggle and Colab too.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 OK = "[ OK ]"
 FAIL = "[FAIL]"
@@ -76,37 +78,44 @@ def check_seeding():
 def check_results_logging():
     from src.results import load_results, log_run, summarise
 
-    # Two fake runs with the same config but different seeds, so summarise()
-    # has something to compute a std over.
-    for seed, acc in [(0, 0.9123), (1, 0.9087)]:
-        log_run(
-            task="identification",
-            train_dataset="ami",
-            arm="zoom+aug",
-            model="resnet50",
-            seed=seed,
-            split_protocol="image_disjoint",
-            epochs=1,
-            batch_size=32,
-            lr=0.0003,
-            img_size=224,
-            test_top1=acc,
-            notes="SMOKE TEST -- delete this row before real runs",
-        )
+    # Always isolate synthetic scores, including when an assertion fails.
+    with TemporaryDirectory(prefix="ear-biometrics-smoke-") as tmp:
+        results_path = Path(tmp) / "results.csv"
+        # Two fake runs with the same config but different seeds, so summarise()
+        # has something to compute a std over.
+        for seed, acc in [(0, 0.9123), (1, 0.9087)]:
+            log_run(
+                path=results_path,
+                task="identification",
+                train_dataset="ami",
+                arm="zoom+aug",
+                model="resnet50",
+                seed=seed,
+                split_protocol="image_disjoint",
+                epochs=1,
+                batch_size=32,
+                lr=0.0003,
+                img_size=224,
+                test_top1=acc,
+                notes="SMOKE TEST -- temporary results only",
+            )
 
-    df = load_results()
-    assert len(df) >= 2, "rows were not written"
+        df = load_results(path=results_path)
+        assert len(df) == 2, "rows were not written"
 
-    # Unknown-field guard should raise, not silently swallow a typo.
-    try:
-        log_run(train_dataset="ami", test_topl=0.5)  # note: lowercase L typo
-    except KeyError:
-        print(f"       typo guard works (rejected 'test_topl')")
-    else:
-        raise AssertionError("unknown field was silently accepted -- guard broken")
+        # Unknown-field guard should raise, not silently swallow a typo.
+        try:
+            log_run(path=results_path, train_dataset="ami", test_topl=0.5)  # note: lowercase L typo
+        except KeyError:
+            print(f"       typo guard works (rejected 'test_topl')")
+        else:
+            raise AssertionError("unknown field was silently accepted -- guard broken")
 
-    print(summarise().to_string(index=False))
-    print(f"{OK} results.csv writes, reads back, and summarises")
+        summary = summarise(path=results_path)
+        assert len(summary) == 1 and summary.iloc[0]["n_seeds"] == 2
+        assert abs(summary.iloc[0]["mean"] - 0.9105) < 1e-9
+        print(summary.to_string(index=False))
+        print(f"{OK} results.csv writes, reads back, and summarises")
 
 
 def main() -> int:
@@ -130,10 +139,11 @@ def main() -> int:
         print(f"{FAIL} {len(failed)} check(s) failed: {', '.join(failed)}")
         return 1
     print(f"{OK} Phase 0 complete -- skeleton is sound.")
-    print("     Next: delete the smoke-test rows from results/results.csv,")
-    print("     then move to Phase 1 (data + split protocol).")
+    print("     Logging checks used temporary storage; experiment results are untouched.")
+    print("     Next: Phase 1 (data + split protocol).")
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
